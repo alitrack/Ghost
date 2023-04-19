@@ -14,7 +14,7 @@ module.exports = combineTransactionalMigrations(
         group: 'pintura'
     }),
     addSetting({
-        key: 'pintura_js_css',
+        key: 'pintura_css_url',
         value: null,
         type: 'string',
         group: 'pintura'
