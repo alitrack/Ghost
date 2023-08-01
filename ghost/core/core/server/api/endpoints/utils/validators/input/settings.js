@@ -1,8 +1,8 @@
-const Promise = require('bluebird');
 const _ = require('lodash');
 const {ValidationError} = require('@tryghost/errors');
 const validator = require('@tryghost/validator');
 const tpl = require('@tryghost/tpl');
+const AnnouncementBarSettings = require('@tryghost/announcement-bar-settings');
 
 const messages = {
     invalidEmailReceived: 'Please send a valid email',
@@ -22,7 +22,8 @@ module.exports = {
             const arrayTypeSettings = [
                 'notifications',
                 'navigation',
-                'secondary_navigation'
+                'secondary_navigation',
+                'announcement_visibility'
             ];
 
             const emailTypeSettings = [
@@ -64,14 +65,25 @@ module.exports = {
             }
 
             if (setting.key === 'announcement_visibility') {
-                const visibilityValue = setting.value;
+                // NOTE: safe to parse because of array validation up top
+                const visibilityValues = JSON.parse(setting.value);
 
-                if (!['public', 'visitors', 'members', 'paid'].includes(visibilityValue)) {
-                    const visibilityError = new ValidationError({
-                        message: tpl(messages.invalidAnnouncementVisibilityValueReceived),
-                        property: setting.key
+                const validVisibilityValues = [
+                    AnnouncementBarSettings.VisibilityValues.VISITORS,
+                    AnnouncementBarSettings.VisibilityValues.FREE_MEMBERS,
+                    AnnouncementBarSettings.VisibilityValues.PAID_MEMBERS
+                ];
+
+                if (visibilityValues.length) {
+                    visibilityValues.forEach((visibilityValue) => {
+                        if (!validVisibilityValues.includes(visibilityValue)) {
+                            const visibilityError = new ValidationError({
+                                message: tpl(messages.invalidAnnouncementVisibilityValueReceived),
+                                property: setting.key
+                            });
+                            errors.push(visibilityError);
+                        }
                     });
-                    errors.push(visibilityError);
                 }
             }
 

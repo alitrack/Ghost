@@ -498,14 +498,8 @@
             "flags": "PUBLIC"
         },
         "announcement_visibility": {
-            "defaultValue": "public",
-            "type": "string",
-            "isIn": [[
-                "public",
-                "visitors",
-                "members",
-                "paid"
-            ]]
+            "defaultValue": "[]",
+            "type": "array"
         },
         "announcement_background": {
             "defaultValue": "dark",
@@ -540,6 +534,28 @@
                 "isIn": [["true", "false"]]
             },
             "type": "boolean"
+        }
+    },
+    "pintura": {
+        "pintura": {
+            "defaultValue": "true",
+            "validations": {
+                "isIn": [
+                    [
+                        "true",
+                        "false"
+                    ]
+                ]
+            },
+            "type": "boolean"
+        },
+        "pintura_js_url": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "pintura_css_url": {
+            "defaultValue": null,
+            "type": "string"
         }
     }
 }

@@ -6,6 +6,7 @@ import UnpublishPostsModal from './modals/unpublish-posts';
 import nql from '@tryghost/nql';
 import {action} from '@ember/object';
 import {capitalizeFirstLetter} from 'ghost-admin/helpers/capitalize-first-letter';
+import {posts as postExpansions} from '@tryghost/nql-filter-expansions';
 import {inject as service} from '@ember/service';
 import {task} from 'ember-concurrency';
 
@@ -39,6 +40,10 @@ const messages = {
     tagAdded: {
         single: 'Tag added successfully',
         multiple: 'Tag added successfully to {count} {type}s'
+    },
+    duplicated: {
+        single: '{Type} duplicated successfully',
+        multiple: '{count} {type}s duplicated successfully'
     }
 };
 
@@ -114,6 +119,11 @@ export default class PostsContextMenu extends Component {
             selectionList: this.selectionList,
             confirm: this.editPostsAccessTask
         });
+    }
+
+    @action
+    async copyPosts() {
+        this.menu.performTask(this.copyPostsTask);
     }
 
     @task
@@ -247,13 +257,15 @@ export default class PostsContextMenu extends Component {
     updateFilteredPosts() {
         const updatedModels = this.selectionList.availableModels;
         const filter = this.selectionList.allFilter;
-        const filterNql = nql(filter);
+        const filterNql = nql(filter, {
+            expansions: postExpansions
+        });
 
         const remainingModels = this.selectionList.infinityModel.content.filter((model) => {
             if (!updatedModels.find(u => u.id === model.id)) {
                 return true;
             }
-            return filterNql.queryJSON(model);
+            return filterNql.queryJSON(model.serialize({includeId: true}));
         });
         // Deleteobjects method from infintiymodel is broken for all models except the first page, so we cannot use this
         this.infinity.replace(this.selectionList.infinityModel, remainingModels);
@@ -342,6 +354,29 @@ export default class PostsContextMenu extends Component {
         return true;
     }
 
+    @task
+    *copyPostsTask() {
+        try {
+            const result = yield this.performCopy();
+
+            // Add to the store and retrieve model
+            this.store.pushPayload(result);
+
+            const data = result[this.type === 'post' ? 'posts' : 'pages'][0];
+            const model = this.store.peekRecord(this.type, data.id);
+
+            // Update infinity list
+            this.selectionList.infinityModel.content.unshiftObject(model);
+
+            // Show notification
+            this.notifications.showNotification(this.#getToastMessage('duplicated'), {type: 'success'});
+        } catch (error) {
+            this.notifications.showAPIError(error, {key: `${this.type}.copy.failed`});
+        }
+
+        return true;
+    }
+
     async performBulkDestroy() {
         const filter = this.selectionList.filter;
         let bulkUpdateUrl = this.ghostPaths.url.api(this.type === 'post' ? 'posts' : 'pages') + `?filter=${encodeURIComponent(filter)}`;
@@ -359,6 +394,12 @@ export default class PostsContextMenu extends Component {
                 }
             }
         });
+    }
+
+    async performCopy() {
+        const id = this.selectionList.availableModels[0].id;
+        const copyUrl = this.ghostPaths.url.api(`${this.type === 'post' ? 'posts' : 'pages'}/${id}/copy`) + '?formats=mobiledoc,lexical';
+        return await this.ajax.post(copyUrl);
     }
 
     get shouldFeatureSelection() {
@@ -387,5 +428,9 @@ export default class PostsContextMenu extends Component {
             }
         }
         return false;
+    }
+
+    get canCopySelection() {
+        return this.selectionList.availableModels.length === 1;
     }
 }

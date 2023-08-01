@@ -1,4 +1,5 @@
 import Component from '@glimmer/component';
+import trackEvent from '../utils/analytics';
 import {action} from '@ember/object';
 import {inject} from 'ghost-admin/decorators/inject';
 import {inject as service} from '@ember/service';
@@ -7,6 +8,7 @@ import {tracked} from '@glimmer/tracking';
 export default class KoenigImageEditor extends Component {
     @service ajax;
     @service feature;
+    @service settings;
     @service ghostPaths;
     @tracked scriptLoaded = false;
     @tracked cssLoaded = false;
@@ -17,11 +19,26 @@ export default class KoenigImageEditor extends Component {
         return this.scriptLoaded && this.cssLoaded;
     }
 
-    getImageEditorJSUrl() {
-        if (!this.config.pintura?.js) {
+    get pinturaJsUrl() {
+        if (!this.settings.pintura) {
             return null;
         }
-        let importUrl = this.config.pintura.js;
+        return this.config.pintura?.js || this.settings.pinturaJsUrl;
+    }
+
+    get pinturaCSSUrl() {
+        if (!this.settings.pintura) {
+            return null;
+        }
+        return this.config.pintura?.css || this.settings.pinturaCssUrl;
+    }
+
+    getImageEditorJSUrl() {
+        let importUrl = this.pinturaJsUrl;
+
+        if (!importUrl) {
+            return null;
+        }
 
         // load the script from admin root if relative
         if (importUrl.startsWith('/')) {
@@ -31,10 +48,11 @@ export default class KoenigImageEditor extends Component {
     }
 
     getImageEditorCSSUrl() {
-        if (!this.config.pintura?.css) {
+        let cssImportUrl = this.pinturaCSSUrl;
+
+        if (!cssImportUrl) {
             return null;
         }
-        let cssImportUrl = this.config.pintura.css;
 
         // load the css from admin root if relative
         if (cssImportUrl.startsWith('/')) {
@@ -111,17 +129,74 @@ export default class KoenigImageEditor extends Component {
     }
 
     @action
-    async handleClick() {
-        if (window.pintura) {
-            const imageSrc = `${this.args.imageSrc}?v=${Date.now()}`;
+    async onUploadComplete(urlList) {
+        if (this.args.saveUrl) {
+            const url = urlList[0].url;
+            this.args.saveUrl(url);
+        }
+    }
+
+    @action
+    async handleClick(uploader) {
+        if (this.isEditorEnabled && this.args.imageSrc) {
+            // add a timestamp to the image src to bypass cache
+            // avoids cors issues with cached images
+            const imageUrl = new URL(this.args.imageSrc);
+            if (!imageUrl.searchParams.has('v')) {
+                imageUrl.searchParams.set('v', Date.now());
+            }
+            trackEvent('Image Edit Button Clicked', {location: 'admin'});
+            const imageSrc = imageUrl.href;
             const editor = window.pintura.openDefaultEditor({
                 src: imageSrc,
+                enableTransparencyGrid: true,
                 util: 'crop',
                 utils: [
                     'crop',
                     'filter',
                     'finetune',
-                    'redact'
+                    'redact',
+                    'annotate',
+                    'trim',
+                    'frame',
+                    'sticker'
+                ],
+                stickerStickToImage: true,
+                frameOptions: [
+                    // No frame
+                    [undefined, locale => locale.labelNone],
+
+                    // Sharp edge frame
+                    ['solidSharp', locale => locale.frameLabelMatSharp],
+
+                    // Rounded edge frame
+                    ['solidRound', locale => locale.frameLabelMatRound],
+
+                    // A single line frame
+                    ['lineSingle', locale => locale.frameLabelLineSingle],
+
+                    // A frame with cornenr hooks
+                    ['hook', locale => locale.frameLabelCornerHooks],
+
+                    // A polaroid frame
+                    ['polaroid', locale => locale.frameLabelPolaroid]
+                ],
+                cropSelectPresetFilter: 'landscape',
+                cropSelectPresetOptions: [
+                    [undefined, 'Custom'],
+                    [1, 'Square'],
+                    // shown when cropSelectPresetFilter is set to 'landscape'
+                    [2 / 1, '2:1'],
+                    [3 / 2, '3:2'],
+                    [4 / 3, '4:3'],
+                    [16 / 10, '16:10'],
+                    [16 / 9, '16:9'],
+                    // shown when cropSelectPresetFilter is set to 'portrait'
+                    [1 / 2, '1:2'],
+                    [2 / 3, '2:3'],
+                    [3 / 4, '3:4'],
+                    [10 / 16, '10:16'],
+                    [9 / 16, '9:16']
                 ],
                 locale: {
                     labelButtonExport: 'Save and close'
@@ -134,7 +209,17 @@ export default class KoenigImageEditor extends Component {
 
             editor.on('process', (result) => {
                 // save edited image
-                this.args.saveImage(result.dest);
+                try {
+                    if (this.args.saveImage) {
+                        this.args.saveImage(result.dest);
+                    }
+                    if (this.args.saveUrl) {
+                        uploader.setFiles([result.dest]);
+                    }
+                    trackEvent('Image Edit Saved', {location: 'admin'});
+                } catch (e) {
+                    // Failed to save edited image
+                }
             });
         }
     }

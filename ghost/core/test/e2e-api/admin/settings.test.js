@@ -1,4 +1,4 @@
-const assert = require('assert');
+const assert = require('assert/strict');
 const sinon = require('sinon');
 const logging = require('@tryghost/logging');
 const SingleUseTokenProvider = require('../../../core/server/services/members/SingleUseTokenProvider');
@@ -8,7 +8,7 @@ const {stringMatching, anyEtag, anyUuid, anyContentLength, anyContentVersion} = 
 const models = require('../../../core/server/models');
 const {anyErrorId} = matchers;
 
-const CURRENT_SETTINGS_COUNT = 76;
+const CURRENT_SETTINGS_COUNT = 79;
 
 const settingsMatcher = {};
 
@@ -111,6 +111,10 @@ describe('Settings API', function () {
                 {
                     key: 'announcement_content',
                     value: '<p>Great news coming soon!</p>'
+                },
+                {
+                    key: 'announcement_visibility',
+                    value: JSON.stringify(['visitors', 'free_members'])
                 },
                 {
                     key: 'navigation',
@@ -244,7 +248,7 @@ describe('Settings API', function () {
                 })
                 .expect(({body}) => {
                     const emailVerificationRequired = body.settings.find(setting => setting.key === 'email_verification_required');
-                    assert.strictEqual(emailVerificationRequired.value, false);
+                    assert.equal(emailVerificationRequired.value, false);
                 });
             mockManager.assert.sentEmailCount(0);
         });
@@ -266,7 +270,7 @@ describe('Settings API', function () {
                 })
                 .expect(({body}) => {
                     const membersSupportAddress = body.settings.find(setting => setting.key === 'members_support_address');
-                    assert.strictEqual(membersSupportAddress.value, 'noreply');
+                    assert.equal(membersSupportAddress.value, 'noreply');
 
                     assert.deepEqual(body.meta, {
                         sent_email_verification: ['members_support_address']
@@ -302,7 +306,7 @@ describe('Settings API', function () {
                 })
                 .expect(({body}) => {
                     const membersSupportAddress = body.settings.find(setting => setting.key === 'members_support_address');
-                    assert.strictEqual(membersSupportAddress.value, 'support@example.com');
+                    assert.equal(membersSupportAddress.value, 'support@example.com');
 
                     assert.deepEqual(body.meta, {});
                 });
@@ -315,7 +319,7 @@ describe('Settings API', function () {
             const settingsToChange = [
                 {
                     key: 'announcement_visibility',
-                    value: 'invalid value'
+                    value: JSON.stringify(['invalid value'])
                 }
             ];
 
@@ -393,7 +397,7 @@ describe('Settings API', function () {
                 })
                 .expect(({body}) => {
                     const membersSupportAddress = body.settings.find(setting => setting.key === 'members_support_address');
-                    assert.strictEqual(membersSupportAddress.value, 'support@example.com');
+                    assert.equal(membersSupportAddress.value, 'support@example.com');
                 });
 
             mockManager.assert.sentEmailCount(0);

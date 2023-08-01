@@ -16,7 +16,7 @@ export function feature(name, options = {}) {
 
             if (user) {
                 enabled = this.get(`accessibility.${name}`);
-            } else if (this.get(`config.${name}`)) {
+            } else if (typeof this.get(`config.${name}`) === 'boolean') {
                 enabled = this.get(`config.${name}`);
             } else {
                 enabled = this.get(`labs.${name}`) || false;
@@ -60,22 +60,25 @@ export default class FeatureService extends Service {
 
     // labs flags
     @feature('urlCache') urlCache;
-    @feature('memberAttribution') memberAttribution;
-    @feature('sourceAttribution') sourceAttribution;
     @feature('lexicalEditor') lexicalEditor;
     @feature('lexicalMultiplayer') lexicalMultiplayer;
     @feature('audienceFeedback') audienceFeedback;
-    @feature('suppressionList') suppressionList;
     @feature('webmentions') webmentions;
-    @feature('emailErrors') emailErrors;
     @feature('websockets') websockets;
     @feature('stripeAutomaticTax') stripeAutomaticTax;
-    @feature('makingItRain') makingItRain;
-    @feature('migrateApp') migrateApp;
+    @feature('emailCustomization') emailCustomization;
     @feature('i18n') i18n;
-    @feature('postHistory') postHistory;
     @feature('announcementBar') announcementBar;
-    @feature('imageEditor') imageEditor;
+    @feature('signupCard') signupCard;
+    @feature('signupForm') signupForm;
+    @feature('collections') collections;
+    @feature('adminXSettings') adminXSettings;
+    @feature('flatUrls') flatUrls;
+    @feature('mailEvents') mailEvents;
+    @feature('collectionsCard') collectionsCard;
+    @feature('headerUpgrade') headerUpgrade;
+    @feature('importMemberTier') importMemberTier;
+    @feature('tipsAndDonations') tipsAndDonations;
 
     _user = null;
 

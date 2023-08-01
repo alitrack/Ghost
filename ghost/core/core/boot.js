@@ -64,7 +64,7 @@ function notifyServerReady(error) {
   * @param {object} options.config
   */
 async function initDatabase({config}) {
-    const DatabaseStateManager = require('./server/data/db/state-manager');
+    const DatabaseStateManager = require('./server/data/db/DatabaseStateManager');
     const dbStateManager = new DatabaseStateManager({knexMigratorFilePath: config.get('paths:appRoot')});
     await dbStateManager.makeReady();
 
@@ -325,6 +325,9 @@ async function initServices({config}) {
     const postsPublic = require('./server/services/posts-public');
     const slackNotifications = require('./server/services/slack-notifications');
     const mediaInliner = require('./server/services/media-inliner');
+    const collections = require('./server/services/collections');
+    const mailEvents = require('./server/services/mail-events');
+    const donationService = require('./server/services/donations');
 
     const urlUtils = require('./shared/url-utils');
 
@@ -361,7 +364,10 @@ async function initServices({config}) {
         linkTracking.init(),
         emailSuppressionList.init(),
         slackNotifications.init(),
-        mediaInliner.init()
+        collections.init(),
+        mediaInliner.init(),
+        mailEvents.init(),
+        donationService.init()
     ]);
     debug('End: Services');
 
@@ -476,7 +482,7 @@ async function bootGhost({backend = true, frontend = true, server = true} = {}) 
         const rootApp = require('./app')();
 
         if (server) {
-            const GhostServer = require('./server/ghost-server');
+            const GhostServer = require('./server/GhostServer');
             ghostServer = new GhostServer({url: config.getSiteUrl(), env: config.get('env'), serverConfig: config.get('server')});
             await ghostServer.start(rootApp);
             bootLogger.log('server started');

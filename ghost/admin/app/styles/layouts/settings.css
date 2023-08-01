@@ -193,7 +193,8 @@
 }
 
 .gh-setting-title {
-    margin-bottom: 2px;
+    display: block;
+    margin-bottom: 12px;
     font-size: 1.5rem;
     letter-spacing: 0;
     line-height: 1.15em;
@@ -206,17 +207,25 @@
     font-weight: 500;
 }
 
+.gh-setting-title.mb0 {
+    margin-bottom: 0;
+}
+
 .gh-setting-desc {
     line-height: 1.4em;
     color: var(--middarkgrey);
     letter-spacing: 0.3px;
     font-size: 1.3rem;
     font-weight: 400;
-    margin: 4px 0 12px;
+    margin: 8px 0 12px;
 }
 
 .gh-setting-desc.mb0 {
     margin-bottom: 0;
+}
+
+.gh-setting-title + .gh-setting-desc {
+    margin-top: -4px;
 }
 
 .gh-setting-error {
@@ -225,6 +234,15 @@
     color: var(--red);
     font-weight: 300;
     letter-spacing: 0.3px;
+}
+
+:is(.gh-setting-title, .gh-setting-desc) + .gh-setting-error {
+    margin-top: -4px;
+    font-size: 1.3rem;
+}
+
+.gh-setting-title + .gh-setting-error {
+    margin-top: 8px;
 }
 
 .gh-setting-action {
@@ -1770,6 +1788,14 @@ p.theme-validation-details {
     letter-spacing: .2px;
 }
 
+.gh-nav-header.no-accordion {
+    padding-bottom: 32px;
+}
+
+.gh-nav-header.no-accordion + .gh-nav-body .gh-nav-top:first-of-type .gh-nav-design-settings {
+    margin-top: 4px;
+}
+
 .gh-nav-menu-back-button {
     display: flex;
     align-items: center;
@@ -2045,10 +2071,20 @@ p.theme-validation-details {
     opacity: 0;
 }
 
+.gh-nav-design .gh-setting-action-largeimg-edit,
+.gh-nav-design .gh-setting-action-smallimg-edit {
+    right: 40px;
+}
+
 .gh-nav-design .gh-setting-action-largeimg-delete:hover,
 .gh-nav-design .gh-setting-action-smallimg-delete:hover {
     background: var(--red);
     border-color: transparent;
+}
+
+.gh-nav-design .gh-setting-action-smallimg-edit:hover,
+.gh-nav-design .gh-setting-action-largeimg-edit:hover {
+    background: var(--middarkgrey);
 }
 
 .gh-nav-design .gh-setting-action-largeimg-delete svg,
@@ -2062,8 +2098,16 @@ p.theme-validation-details {
     margin: 0;
 }
 
-.gh-theme-setting-title {
-    margin-bottom: 1rem;
+.gh-nav-design .for-checkbox .input-toggle-component {
+    background-color: var(--white);
+}
+
+.gh-nav-design .kg-settings-panel-control-input {
+    margin-right: -4px;
+}
+
+.gh-nav-design .kg-settings-headerstyle-btn-group .kg-headerstyle-btn-light {
+    border-color: color-mod(var(--lightgrey) l(-5%) s(-10%));
 }
 
 .gh-design {
@@ -3043,6 +3087,100 @@ p.theme-validation-details {
     color: var(--midgrey);
 }
 
+/* Signup form modal */
+.gh-signup-form-embed {
+    margin: 6vw 0;
+}
+
+.fullwidth-modal {
+    max-width: 100%;
+}
+
+.epm-modal .modal-signup-form-embed {
+    display: grid;
+    grid-template-columns: 5fr 3fr;
+    max-width: 1120px;
+    max-height: 520px;
+    margin: 32px;
+    padding: 0;
+}
+
+@media (max-width: 960px) {
+    .epm-modal .modal-signup-form-embed {
+        grid-template-columns: 1fr;
+    }
+}
+
+.modal-signup-form-embed-preview {
+    position: relative;
+    margin: 1.6rem;
+    margin-right: 0;
+    overflow: hidden;
+    border: 1px solid var(--whitegrey);
+}
+
+@media (max-width: 960px) {
+    .modal-signup-form-embed-preview {
+        display: none;
+    }
+}
+
+.gh-signup-form-iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    border: 0;
+    opacity: 1;
+    z-index: 0;
+    transition: none;
+}
+
+.gh-signup-form-iframe.gh-iframe-hidden {
+    opacity: 0;
+    z-index: 1;
+    transition: 0.3s opacity;
+    pointer-events: none;
+}
+
+.modal-signup-form-embed-main {
+    padding: 32px;
+    height: 100%;
+}
+
+.modal-signup-form-embed-main .modal-body {
+    height: 320px;
+    margin: 0 -32px;
+    padding: 0 32px;
+    overflow-y: auto;
+}
+
+.modal-signup-form-embed-main .form-group {
+    margin-bottom: 0;
+}
+
+.gh-signup-form-container .gh-stack-item {
+    margin-bottom: 1.6rem;
+}
+
+.gh-signup-form-container .gh-stack-item:last-child {
+    margin-bottom: 0;
+}
+
+.gh-signup-form-embed-code-input {
+    min-height: 72px;
+    background: var(--whitegrey-l2);
+    font-family: var(--font-family-mono);
+    font-size: 1.35rem;
+}
+
+.gh-signup-form-embed-code-input:focus {
+    background: var(--whitegrey-l2);
+    border-color: var(--lightgrey-l1) !important;
+    box-shadow: none;
+}
+
 /* History log
 /* ---------------------------------------------------------- */
 .gh-history-filter-li {
@@ -3123,7 +3261,6 @@ p.theme-validation-details {
     color: var(--darkgrey);
     white-space: nowrap;
     margin-top: 2px;
-    font-weight: 500;
 }
 
 .gh-history-description a {
@@ -3688,12 +3825,17 @@ p.theme-validation-details {
 /* Announcement bar */
 
 .gh-announcement-editor {
-    height: 120px;
+    min-height: 120px;
+    overflow: auto;
     padding: 6px 12px 6px 12px;
     border: 1px solid var(--whitegrey-d1);
     background: var(--white);
     border-radius: 4px;
     word-break: break-word;
+}
+
+.gh-announcement-editor.dark {
+    background: #15171A;
 }
 
 .gh-announcement-editor .koenig-lexical *,
@@ -3706,6 +3848,9 @@ p.theme-validation-details {
 .gh-announcement-editor .koenig-lexical p,
 .gh-announcement-editor .koenig-lexical .kg-prose {
     height: 108px;
+    color: var(--darkgrey);
+    font-size: 1.4rem !important;
+    line-height: 1.5em !important;
 }
 
 .gh-announcement-editor .koenig-lexical a {

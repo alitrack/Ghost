@@ -123,15 +123,76 @@ const KoenigEditor = (props) => {
     return <_KoenigEditor {...props} />;
 };
 
+const WordCountPlugin = (props) => {
+    const {WordCountPlugin: _WordCountPlugin} = editorResource.read();
+    return <_WordCountPlugin {...props} />;
+};
+
 export default class KoenigLexicalEditor extends Component {
     @service ajax;
     @service feature;
     @service ghostPaths;
     @service session;
     @service store;
+    @service settings;
+    @service membersUtils;
 
     @inject config;
     offers = null;
+
+    get pinturaJsUrl() {
+        if (!this.settings.pintura) {
+            return null;
+        }
+        return this.config.pintura?.js || this.settings.pinturaJsUrl;
+    }
+
+    get pinturaCSSUrl() {
+        if (!this.settings.pintura) {
+            return null;
+        }
+        return this.config.pintura?.css || this.settings.pinturaCssUrl;
+    }
+
+    get pinturaConfig() {
+        const jsUrl = this.getImageEditorJSUrl();
+        const cssUrl = this.getImageEditorCSSUrl();
+        if (!this.feature.lexicalEditor || !jsUrl || !cssUrl) {
+            return null;
+        }
+        return {
+            jsUrl,
+            cssUrl
+        };
+    }
+
+    getImageEditorJSUrl() {
+        let importUrl = this.pinturaJsUrl;
+
+        if (!importUrl) {
+            return null;
+        }
+
+        // load the script from admin root if relative
+        if (importUrl.startsWith('/')) {
+            importUrl = window.location.origin + this.ghostPaths.adminRoot.replace(/\/$/, '') + importUrl;
+        }
+        return importUrl;
+    }
+
+    getImageEditorCSSUrl() {
+        let cssImportUrl = this.pinturaCSSUrl;
+
+        if (!cssImportUrl) {
+            return null;
+        }
+
+        // load the css from admin root if relative
+        if (cssImportUrl.startsWith('/')) {
+            cssImportUrl = window.location.origin + this.ghostPaths.adminRoot.replace(/\/$/, '') + cssImportUrl;
+        }
+        return cssImportUrl;
+    }
 
     @action
     onError(error) {
@@ -140,12 +201,14 @@ export default class KoenigLexicalEditor extends Component {
 
         if (this.config.sentry_dsn) {
             Sentry.captureException(error, {
-                tags: {
-                    lexical: true
+                tags: {lexical: true},
+                contexts: {
+                    koenig: {
+                        version: window['@tryghost/koenig-lexical']?.version
+                    }
                 }
             });
         }
-
         // don't rethrow, Lexical will attempt to gracefully recover
     }
 
@@ -158,6 +221,16 @@ export default class KoenigLexicalEditor extends Component {
         return this.offers;
     }
 
+    @task({restartable: true})
+    *fetchLabelsTask() {
+        if (this.labels) {
+            return this.labels;
+        }
+
+        this.labels = yield this.store.query('label', {limit: 'all', fields: 'id, name'});
+        return this.labels;
+    }
+
     ReactComponent = (props) => {
         const fetchEmbed = async (url, {type}) => {
             let oembedEndpoint = this.ghostPaths.url.api('oembed');
@@ -165,6 +238,17 @@ export default class KoenigLexicalEditor extends Component {
                 data: {url, type}
             });
             return response;
+        };
+
+        const fetchCollectionPosts = async (collectionSlug) => {
+            const collectionPostsEndpoint = this.ghostPaths.url.api('posts');
+            const {posts} = await this.ajax.request(collectionPostsEndpoint, {
+                data: {
+                    collection: collectionSlug, 
+                    limit: 12
+                }
+            });
+            return posts;
         };
 
         const fetchAutocompleteLinks = async () => {
@@ -181,7 +265,30 @@ export default class KoenigLexicalEditor extends Component {
                     value: this.config.getSiteUrl(offer.code)
                 };
             });
-            return [...defaults, ...offersLinks];
+
+            const memberLinks = () => {
+                let links = [];
+                if (this.membersUtils.paidMembersEnabled) {
+                    links = [
+                        {
+                            label: 'Paid signup',
+                            value: this.config.getSiteUrl('/#/portal/signup')
+                        },
+                        {
+                            label: 'Upgrade or change plan',
+                            value: this.config.getSiteUrl('/#/portal/account/plans')
+                        }];
+                }
+
+                return links;
+            };
+            return [...defaults, ...offersLinks, ...memberLinks()];
+        };
+
+        const fetchLabels = async () => {
+            const labels = await this.fetchLabelsTask.perform();
+
+            return labels.map(label => label.name);
         };
 
         const defaultCardConfig = {
@@ -195,10 +302,21 @@ export default class KoenigLexicalEditor extends Component {
                 }
             },
             tenor: this.config.tenor?.googleApiKey ? this.config.tenor : null,
-            fetchEmbed: fetchEmbed,
-            fetchAutocompleteLinks
+            fetchEmbed,
+            fetchCollectionPosts,
+            fetchAutocompleteLinks,
+            fetchLabels,
+            feature: {
+                signupCard: true,
+                collectionsCard: this.feature.get('collectionsCard'),
+                collections: this.feature.get('collections'),
+                headerV2: this.feature.get('headerUpgrade')
+            },
+            membersEnabled: this.settings.get('membersSignupAccess') === 'all',
+            siteTitle: this.settings.title,
+            siteDescription: this.settings.description
         };
-        const cardConfig = Object.assign({}, defaultCardConfig, props.cardConfig);
+        const cardConfig = Object.assign({}, defaultCardConfig, props.cardConfig, {pinturaConfig: this.pinturaConfig});
 
         const useFileUpload = (type = 'image') => {
             const [progress, setProgress] = React.useState(0);
@@ -403,7 +521,7 @@ export default class KoenigLexicalEditor extends Component {
         const multiplayerUsername = this.session.user.name;
 
         return (
-            <div className={['koenig-react-editor', this.args.className].filter(Boolean).join(' ')}>
+            <div className={['koenig-react-editor', 'koenig-lexical', this.args.className].filter(Boolean).join(' ')}>
                 <ErrorHandler>
                     <Suspense fallback={<p className="koenig-react-editor-loading">Loading editor...</p>}>
                         <KoenigComposer
@@ -415,6 +533,7 @@ export default class KoenigLexicalEditor extends Component {
                             multiplayerDocId={multiplayerDocId}
                             multiplayerEndpoint={multiplayerEndpoint}
                             onError={this.onError}
+                            darkMode={this.feature.nightShift}
                         >
                             <KoenigEditor
                                 cursorDidExitAtTop={this.args.cursorDidExitAtTop}
@@ -422,6 +541,7 @@ export default class KoenigLexicalEditor extends Component {
                                 onChange={this.args.onChange}
                                 registerAPI={this.args.registerAPI}
                             />
+                            <WordCountPlugin onChange={this.args.updateWordCount} />
                         </KoenigComposer>
                     </Suspense>
                 </ErrorHandler>

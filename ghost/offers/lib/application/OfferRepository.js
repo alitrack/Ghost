@@ -1,8 +1,8 @@
 const {flowRight} = require('lodash');
 const {mapKeyValues, mapQuery} = require('@tryghost/mongo-utils');
 const DomainEvents = require('@tryghost/domain-events');
-const OfferCodeChangeEvent = require('../domain/events/OfferCodeChange');
-const OfferCreatedEvent = require('../domain/events/OfferCreated');
+const OfferCodeChangeEvent = require('../domain/events/OfferCodeChangeEvent');
+const OfferCreatedEvent = require('../domain/events/OfferCreatedEvent');
 const Offer = require('../domain/models/Offer');
 const OfferStatus = require('../domain/models/OfferStatus');
 
@@ -41,6 +41,14 @@ const mongoTransformer = flowRight(statusTransformer, rejectNonStatusTransformer
  * @typedef {object} ListOptions
  * @prop {import('knex').Transaction} transacting
  * @prop {string} filter
+ */
+
+/**
+ * @typedef {object} OfferAdditionalParams
+ * @prop {string} productId — the Ghost Product ID
+ * @prop {string} currency — the currency of the plan
+ * @prop {string} interval — the billing interval of the plan (month, year)
+ * @prop {boolean} active — whether the offer is active upoon creation
  */
 
 class OfferRepository {
@@ -177,6 +185,39 @@ class OfferRepository {
         const offers = models.map(model => this.mapToOffer(model, mapOptions));
 
         return Promise.all(offers);
+    }
+
+    /**
+      * @param {import('stripe').Stripe.CouponCreateParams} coupon
+      * @param {OfferAdditionalParams} params
+      * @param {BaseOptions} [options]
+     */
+    async createFromCoupon(coupon, params, options) {
+        const {productId, currency, interval, active} = params;
+        const code = coupon.name && coupon.name.split(' ').map(word => word.toLowerCase()).join('-');
+
+        const data = {
+            active,
+            name: coupon.name,
+            code,
+            product_id: productId,
+            stripe_coupon_id: coupon.id,
+            interval,
+            currency,
+            duration: coupon.duration,
+            duration_in_months: coupon.duration === 'repeating' ? coupon.duration_in_months : null,
+            portal_title: coupon.name
+        };
+
+        if (coupon.percent_off) {
+            data.discount_type = 'percent';
+            data.discount_amount = coupon.percent_off;
+        } else {
+            data.discount_type = 'amount';
+            data.discount_amount = coupon.amount_off;
+        }
+
+        await this.OfferModel.add(data, options);
     }
 
     /**

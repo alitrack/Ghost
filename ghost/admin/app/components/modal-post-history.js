@@ -1,10 +1,11 @@
-import ModalComponent from 'ghost-admin/components/modal-base';
-import diff from 'node-htmldiff';
-import {action, computed} from '@ember/object';
+import Component from '@glimmer/component';
+import RestoreRevisionModal from '../components/modals/restore-revision';
+import {action, set} from '@ember/object';
+import {inject as service} from '@ember/service';
+import {tracked} from '@glimmer/tracking';
 
 function checkFinishedRendering(element, done) {
     let last = element.innerHTML;
-
     function check() {
         let html = element.innerHTML;
         if (html === last) {
@@ -18,118 +19,147 @@ function checkFinishedRendering(element, done) {
     setTimeout(check, 50);
 }
 
-export default ModalComponent.extend({
-    selectedHTML: null,
-    diffHtml: null,
-    showDifferences: true,
-    selectedRevisionIndex: 0,
+export default class ModalPostHistory extends Component {
+    @service notifications;
+    @service modals;
+    @service ghostPaths;
+    @tracked selectedHTML = null;
+    @tracked selectedRevisionIndex = 0;
 
-    selectedRevision: computed('selectedRevisionIndex', 'revisionList.[]', function () {
+    constructor() {
+        super(...arguments);
+        this.post = this.args.model.post;
+        this.editorAPI = this.args.model.editorAPI;
+        this.toggleSettingsMenu = this.args.model.toggleSettingsMenu;
+    }
+
+    get selectedRevision() {
         return this.revisionList[this.selectedRevisionIndex];
-    }),
+    }
 
-    comparisonRevision: computed('selectedRevisionIndex', 'revisionList.[]', function () {
-        return this.revisionList[this.selectedRevisionIndex + 1] || this.selectedRevision;
-    }),
-
-    previousTitle: computed('comparisonRevision.title', 'post.title', function () {
-        return this.comparisonRevision.title || this.post.get('title');
-    }),
-
-    currentTitle: computed('selectedRevision.title', 'post.title', function () {
+    get currentTitle() {
         return this.selectedRevision.title || this.post.get('title');
-    }),
+    }
 
-    revisionList: computed('post.postRevisions.[]', 'selectedRevisionIndex', function () {
-        return this.post.get('postRevisions').toArray().reverse().map((revision, index) => {
+    get revisionList() {
+        const revisions = this.post.get('postRevisions').toArray().sort((a, b) => b.get('createdAt') - a.get('createdAt'));
+        return revisions.map((revision, index) => {
             return {
                 lexical: revision.get('lexical'),
                 selected: index === this.selectedRevisionIndex,
                 latest: index === 0,
                 createdAt: revision.get('createdAt'),
                 title: revision.get('title'),
+                feature_image: revision.get('featureImage'),
+                feature_image_alt: revision.get('featureImageAlt'),
+                feature_image_caption: revision.get('featureImageCaption'),
                 author: {
-                    name: revision.get('author.name')
-                }
+                    name: revision.get('author.name') || 'Deleted staff user',
+                    profile_image_url: revision.get('author.profileImageUrl')
+                },
+                postStatus: revision.get('postStatus'),
+                reason: revision.get('reason'),
+                new_publish: revision.get('postStatus') === 'published' && revisions[index + 1]?.get('postStatus') === 'draft'
             };
         });
-    }),
+    }
 
-    init() {
-        this._super(...arguments);
-        this.post = this.model;
-    },
+    @action
+    onInsert() {
+        this.updateSelectedHTML();
+        window.addEventListener('keydown', this.handleKeyDown);
+    }
 
-    didInsertElement() {
-        this._super(...arguments);
-        this.updateDiff();
-    },
+    @action
+    willDestroy() {
+        super.willDestroy(...arguments);
+        window.removeEventListener('keydown', this.handleKeyDown);
+    }
 
-    actions: {
-        handleClick(index) {
-            this.set('selectedRevisionIndex', index);
-            this.updateDiff();
-        },
-
-        registerSelectedEditorApi(api) {
-            this.selectedEditor = api;
-        },
-
-        registerComparisonEditorApi(api) {
-            this.comparisonEditor = api;
+    @action
+    handleKeyDown(event) {
+        if (event.key === 'Escape') {
+            this.args.closeModal();
         }
+    }
 
-        // toggleDifferences() {
-        //     this.toggleProperty('showDifferences');
-        // }
-    },
+    @action
+    handleClick(index) {
+        this.selectedRevisionIndex = index;
+        this.updateSelectedHTML();
+    }
 
-    toggleDifferences: action(function () {
-        this.toggleProperty('showDifferences');
-    }),
+    @action
+    registerSelectedEditorApi(api) {
+        this.selectedEditor = api;
+    }
+
+    @action
+    registerComparisonEditorApi(api) {
+        this.comparisonEditor = api;
+    }
+
+    @action
+    closeModal() {
+        this.args.closeModal();
+    }
+
+    stripInitialPlaceholder(html) {
+        //TODO: we should probably add a data attribute to Koenig and grab that instead
+        const regex = /<div\b[^>]*>(\s*Begin writing your post\.\.\.\s*)<\/div>/i;
+        const strippedHtml = html.replace(regex, '');
+        return strippedHtml;
+    }
+
+    @action
+    restoreRevision(index) {
+        const revision = this.revisionList[index];
+        this.modals.open(RestoreRevisionModal, {
+            post: this.post,
+            revision,
+            updateTitle: () => {
+                set(this.post, 'titleScratch', revision.title);
+            },
+            updateEditor: () => {
+                const state = this.editorAPI.editorInstance.parseEditorState(revision.lexical);
+                this.editorAPI.editorInstance.setEditorState(state);
+            },
+            closePostHistoryModal: () => {
+                this.closeModal();
+                this.toggleSettingsMenu();
+            }
+        });
+    }
 
     get cardConfig() {
         return {
-            post: this.model
+            post: this.args.model
         };
-    },
+    }
 
-    updateDiff() {
-        if (this.comparisonEditor && this.selectedEditor) {
-            let comparisonState = this.comparisonEditor.editorInstance.parseEditorState(this.comparisonRevision.lexical);
+    updateSelectedHTML() {
+        if (this.selectedEditor) {
             let selectedState = this.selectedEditor.editorInstance.parseEditorState(this.selectedRevision.lexical);
 
-            this.comparisonEditor.editorInstance.setEditorState(comparisonState);
             this.selectedEditor.editorInstance.setEditorState(selectedState);
         }
 
-        let previous = document.querySelector('.gh-post-history-hidden-lexical.previous');
         let current = document.querySelector('.gh-post-history-hidden-lexical.current');
 
-        let previousDone = false;
         let currentDone = false;
 
-        let updateIfBothDone = () => {
-            if (previousDone && currentDone) {
-                this.set('diffHtml', diff(previous.innerHTML, current.innerHTML));
-                this.set('selectedHTML', current.innerHTML);
+        let updateIfDone = () => {
+            if (currentDone) {
+                this.selectedHTML = this.stripInitialPlaceholder(current.innerHTML);
             }
         };
-
-        checkFinishedRendering(previous, () => {
-            previous.querySelectorAll('[contenteditable]').forEach((el) => {
-                el.setAttribute('contenteditable', false);
-            });
-            previousDone = true;
-            updateIfBothDone();
-        });
 
         checkFinishedRendering(current, () => {
             current.querySelectorAll('[contenteditable]').forEach((el) => {
                 el.setAttribute('contenteditable', false);
             });
             currentDone = true;
-            updateIfBothDone();
+            updateIfDone();
         });
     }
-});
+}

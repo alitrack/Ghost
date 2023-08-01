@@ -12,6 +12,10 @@ module.exports = {
         return apiFramework.pipeline(require('./authentication'), localUtils);
     },
 
+    get collections() {
+        return apiFramework.pipeline(require('./collections'), localUtils);
+    },
+
     get db() {
         return apiFramework.pipeline(require('./db'), localUtils);
     },
@@ -75,6 +79,10 @@ module.exports = {
 
     get settings() {
         return apiFramework.pipeline(require('./settings'), localUtils);
+    },
+
+    get announcements() {
+        return apiFramework.pipeline(require('./announcements'), localUtils);
     },
 
     get membersStripeConnect() {
@@ -193,6 +201,10 @@ module.exports = {
         return apiFramework.pipeline(require('./links'), localUtils);
     },
 
+    get mailEvents() {
+        return apiFramework.pipeline(require('./mail-events'), localUtils);
+    },
+
     /**
      * Content API Controllers
      *
@@ -203,6 +215,10 @@ module.exports = {
      */
     get pagesPublic() {
         return apiFramework.pipeline(require('./pages-public'), localUtils, 'content');
+    },
+
+    get collectionsPublic() {
+        return apiFramework.pipeline(require('./collections-public'), localUtils);
     },
 
     get tagsPublic() {
@@ -239,5 +255,5 @@ module.exports = {
 
     get feedbackMembers() {
         return apiFramework.pipeline(require('./feedback-members'), localUtils, 'members');
-    }   
+    }
 };
